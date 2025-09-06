@@ -8,9 +8,12 @@ export type NotificationCallback = (notification: NotificationEvent) => void;
 class NotificationService {
   private socket: WebSocket | null = null;
   private callbacks: NotificationCallback[] = [];
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private shouldReconnect = true;
 
   connect(url: string = 'ws://localhost:8080'): void {
     if (this.socket) return;
+    this.shouldReconnect = true;
     this.socket = new WebSocket(url);
     this.socket.onmessage = (event: MessageEvent) => {
       try {
@@ -21,10 +24,32 @@ class NotificationService {
         console.error('Failed to parse notification', err);
       }
     };
+    this.socket.onerror = (err: Event) => {
+      console.error('WebSocket error', err);
+    };
+    this.socket.onclose = () => {
+      console.warn('WebSocket closed');
+      this.socket = null;
+      if (this.shouldReconnect) {
+        this.reconnectTimeout = setTimeout(() => this.connect(url), 5000);
+      }
+    };
   }
 
   subscribe(cb: NotificationCallback): void {
     this.callbacks.push(cb);
+  }
+
+  disconnect(): void {
+    this.shouldReconnect = false;
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
   }
 
   private persist(notification: NotificationEvent): void {
