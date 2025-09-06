@@ -16,6 +16,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     notificationService.subscribe((n) => {
       setNotifications((prev) => [...prev, n]);
     });
+    return () => notificationService.disconnect();
   }, []);
 
   const latest = notifications[notifications.length - 1];
